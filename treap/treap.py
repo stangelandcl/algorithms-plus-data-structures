@@ -7,14 +7,14 @@ from random import random, seed
 
 class Node:
         def __init__(self, item, priority):
-                self.item = item
+                self.item     = item
                 self.priority = priority
-                self.left = None
-                self.right = None
+                self.left     = None
+                self.right    = None
 
 class Treap:
         def __init__(self):
-                self.root = None
+                self.root  = None
                 self.count = 0
 
         def add(self, item):
@@ -28,17 +28,17 @@ class Treap:
                 if item < node.item:
                         node.left = self._add(node.left, item)
                         if node.left.priority > node.priority:
-                                temp = node.left
-                                node.left = temp.right
+                                temp       = node.left
+                                node.left  = temp.right
                                 temp.right = node
-                                node = temp
+                                node       = temp
                 elif item > node.item:
                         node.right = self._add(node.right, item)
                         if node.priority < node.right.priority:
-                                temp = node.right
+                                temp       = node.right
                                 node.right = temp.left
-                                temp.left = node
-                                node = temp
+                                temp.left  = node
+                                node       = temp
                 else: 
                         node.item = item
                         self.count += 1
@@ -68,7 +68,7 @@ class Treap:
                 return node
 
         def _reorder(self, node, left, right):
-                if not left: return right
+                if not left:  return right
                 if not right: return left
                 if left.priority > right.priority:
                         left.right = self._reorder(left.right, left.right, right)
@@ -87,7 +87,7 @@ class Treap:
                 return node.item
 
         def clear(self):
-                self.root = None
+                self.root  = None
                 self.count = 0
 
         def items(self):
@@ -102,6 +102,8 @@ class Treap:
                 for x in self._items(node.right):
                         yield x
                 
+
+
 
 import unittest
 class Test(unittest.TestCase):
