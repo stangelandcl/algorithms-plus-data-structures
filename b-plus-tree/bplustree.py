@@ -38,7 +38,7 @@ class Node:
         def take_left(self):
                 half = max((self.count - MinNodeSize)/2, 1)
                 items = []
-                print "h=",half, " k=",len(self.keys), " c=",self.count
+#                print "h=",half, " k=",len(self.keys), " c=",self.count
                 for i in xrange(half):
                         items.append((self.keys[i], self.values[i]))
                 c = self.count
@@ -58,16 +58,19 @@ class Node:
                 return items
 
         def add_from_right(self, node):
-                self.add_range(self.take_right())
+                self.add_range(node.take_right())
 
         def add_from_left(self,node):
-                self.add_range(self.take_left())
+                self.add_range(node.take_left())
 
         def add_range(self, items):
                 for k,v in items:
                         self.add(k,v)
 
         def add(self, key, value):
+                if self.is_internal:
+                        if not isinstance(value, Node):
+                                raise Exception("value is not Node")
                 i = binary_search(self.keys, key)                
                 if i >= 0:
                         self.values[i] = value
@@ -119,7 +122,7 @@ class Internal(Node):
                 return (i, self.values[i])
 
         def update(self, index, node):
-                print "i=",index, " k=",len(self.keys), " n=", len(node.keys)
+#                print "i=",index, " k=",len(self.keys), " n=", len(node.keys)
                 self.keys[index] = node.keys[0]
 
         def update_node(self, index, key):
@@ -142,6 +145,10 @@ class Internal(Node):
                 i += 1
                 if i >= self.count: return None
                 return self.values[i]
+        
+        def replace(self, index, node):
+                self.keys[index]   = node.keys[0]
+                self.values[index] = node
 
 
 class BTree:
@@ -182,14 +189,14 @@ class BTree:
                 if node.is_full:
                         if not parent:
                                 parent = Internal()
-                                parent.add(node)
-                        parent.add(node.split())
+                                parent.add_node(node)
+                        parent.add_node(node.split())
                         node = parent
                 
                 next_index, next_node = node.get_node(key)
                 node.update_node(next_index, key)
                 if next_node.is_internal:
-                        node = self.add_internal(node, next_node, key, value)
+                        node = self._add_internal(node, next_node, key, value)
                 else:
                         if next_node.add(key, value): return parent
                         node.add_node(next_node.split())
@@ -211,13 +218,14 @@ class BTree:
                 next_index, next_node = self.root.get_node(key)
                 rebalanced, new_parent = self._remove(self.root, next_index, next_node, key)
                 if rebalanced and new_parent:
-                        self.root = remove.new_parent
+                        self.root = new_parent
         
         def _remove(self, parent, child_index, child_node, key):
                 if child_node.is_leaf:
                         if not child_node.remove(key):
                                 return (None,None)
-                        parent.update(child_index, child_node)
+                        if not child_node.is_empty:
+                                parent.update(child_index, child_node)
                         return self._rebalance(parent, child_index, child_node)
 
                 grand_child_index, grand_child_node = child_node.get_node(key)
@@ -311,7 +319,7 @@ from random import random
 
 class Test(unittest.TestCase):
         def test(self):
-                count = 1000
+                count = 100000
                 items = list(set(random() for x in xrange(count*2)))[:count]
                 
                 tree = BTree()
