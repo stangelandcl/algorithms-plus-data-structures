@@ -11,6 +11,15 @@ from operator import indexOf
 NodeSize = 128
 MinNodeSize = NodeSize / 2
 
+def type_check(x, t):
+        if not isinstance(x, t):
+                raise Exception("Expected type: " + str(t.__name__) + " got " + str(type(x)))
+
+def same_type_check(a, b):
+        if a.__class__.__name__ != b.__class__.__name__:
+                raise Exception("left is " + a.__class__.__name__ + " while right is " +
+                                b.__class__.__name__)
+
 class Node:
         def __init__(self):
                 self.keys = []
@@ -68,10 +77,13 @@ class Node:
                         self.add(k,v)
 
         def add(self, key, value):
-                if self.is_internal:
-                        if not isinstance(value, Node):
-                                raise Exception("value is not Node")
-                i = binary_search(self.keys, key)                
+#                if self.is_internal:
+#                        type_check(value, Node)
+                
+#                for x in self.values:
+#                        same_type_check(x, value)
+
+                i = binary_search(self.keys, key)                                
                 if i >= 0:
                         self.values[i] = value
                         return True
@@ -135,6 +147,8 @@ class Internal(Node):
 
         def add_node(self, node):
                 self.add(node.keys[0], node)
+#                for x in self.values:
+#                        same_type_check(node, x)
 
         def left_of(self, i):
                 i -= 1
@@ -203,7 +217,7 @@ class BTree:
                         parent = self._add_internal(parent, node, key, value)
                 return parent
 
-        def remove(self, key):
+        def remove(self, key):                
                 if not self.root: return
                 if self.root.is_leaf:
                         self._remove_root_leaf(key)
@@ -215,59 +229,58 @@ class BTree:
                         self.root = None
 
         def _remove_root_internal(self, key):
-                next_index, next_node = self.root.get_node(key)
-                rebalanced, new_parent = self._remove(self.root, next_index, next_node, key)
-                if rebalanced and new_parent:
-                        self.root = new_parent
-        
-        def _remove(self, parent, child_index, child_node, key):
-                if child_node.is_leaf:
-                        if not child_node.remove(key):
-                                return (None,None)
-                        if not child_node.is_empty:
-                                parent.update(child_index, child_node)
-                        return self._rebalance(parent, child_index, child_node)
+                nodes = self.move_to(key)
+                leaf = nodes[-1][1]
+                if not leaf.remove(key): return
+                if not self._rebalance(nodes):
+                        return 
+                self.root = nodes[0][1]
 
-                grand_child_index, grand_child_node = child_node.get_node(key)
-                rebalanced, new_parent = self._remove(child_node, grand_child_index, grand_child_node, key)
-                parent.update(child_index, child_node)                
-
-                if rebalanced:
-                        if new_parent:
-                                parent.replace(child_index, grand_child_node)
-                                child_node = grand_child_node
-                        return self._rebalance(parent, child_index, child_node)
-
-                return (None,None)
-
-        def _rebalance(self, parent, child_index, child_node):
-                if child_node.count >= MinNodeSize:
-                        return (None, None)
+        def _rebalance(self, nodes):
+                leaf = nodes[-1][1]
+                if leaf.count >= MinNodeSize: return
                 
-                left = parent.left_of(child_index)
+                left_nodes = self._left_child(nodes)
+                left = left_nodes[-1][1]
                 if left and left.count > MinNodeSize:
-                        child_node.add_from_right(left)
-                        parent.update(child_index, child_node)
-                        return (None, None)
+                        same_type_check(left, leaf)
 
-                right = parent.right_of(child_index)
+                        leaf.add_from_right(left)
+                        child_index, parent = left_nodes[-2]
+                        parent.update(child_index, leaf)
+                        return
+                right_nodes = self._right_child(nodes)
+                right = right_nodes[-1][1]
                 if right and right.count > MinNodeSize:
-                        child_node.add_from_left(right)
+                        same_type_check(right, leaf)
+
+                        leaf.add_from_left(right)
+                        child_index, parent = right_nodes[-2]
                         parent.update(child_index+1, right)
-                        return (None, None)
+                        return
                 
                 if left:
-                        left.add_range(child_node.items())
+                        same_type_check(left, leaf)
+
+                        left.add_range(leaf.items())
+                        child_index, parent = nodes[-2]
                         parent.update(child_index-1, left)
                         parent.remove_at(child_index)
-                        return (True, None)
-                
+                        self._rebalance(nodes[:-1])
+                        return
                 if right:
-                        right.add_range(child_node.items())
+                        same_type_check(right, leaf)
+
+                        right.add_range(leaf.items())
+                        child_index, parent = nodes[-2]
                         parent.update(child_index+1, right)
                         parent.remove_at(child_index)
-                        return (True, None)
-                return (True, child_node)                        
+                        self._rebalance(nodes[:-1])
+                        return
+
+                nodes[-2] = (0, leaf)
+                self._rebalance(nodes[:-2])
+        
         
         def get(self, key):
                 if not self.root:
@@ -279,24 +292,58 @@ class BTree:
                         return node.get(key)
                 index, next_node = node.get_node(key)
                 return self._get(next_node, key)
+
+        def _left_child(self, nodes):
+                if len(nodes) < 2: return None
+                index, node = nodes[-1]
+                i = len(nodes) - 2
+                while i >= 0:
+                        index2, parent = nodes[i]
+                        index2-=1
+                        if index2 >= 0: break
+                        i-= 1
+                if i < 0: return None
+                left_path = nodes[:i]
+                while True:
+                        left_path.append((index2, parent))
+                        if parent.is_leaf: break
+                        parent = parent.values[index2]
+                        index2 = parent.count -1 # right most
+                return left_path
+        def _right_child(self, nodes):
+                if len(nodes) < 2: return None
+                index, onde = nodes[-1]
+                i = len(nodes)-2
+                while i>=0:
+                        index2, parent = nodes[i]
+                        index2+= 1
+                        if index2 < parent.count: break
+                        i -= 1
+                if i < 0: return None
+                right_path = nodes[:i]
+                while True:
+                        right_path.append((index2, parent))
+                        if parent.is_leaf: break
+                        parent = parent.values[index2]
+                        index2 = 0 # left most
+                return right_path
         
         def move_to(self, key):
                 nodes = []
                 if not self.root:
                         return nodes
-                self._move_to(nodes, key, node)
+                self._move_to(nodes, key, self.root)
                 return nodes
 
-        def _move_to(self, nodes, keys, node):
-                if not node.is_internal:
+        def _move_to(self, nodes, key, node):
+                if node.is_internal:
                         next_index, next_node = node.get_node(key)
                         nodes.append((next_index, node))
                         self._move_to(nodes, key, next_node)
-                        return
-                
-                i = binary_search(node.keys, key)
-                if i < 0: i = ~i
-                nodes.append((i, node))
+                else:                
+                        i = binary_search(node.keys, key)
+                        #if i < 0: i = ~i
+                        nodes.append((i, node))
 
         def items(self):
                 if self.root:
