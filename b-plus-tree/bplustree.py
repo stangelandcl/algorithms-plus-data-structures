@@ -77,15 +77,15 @@ class Node(object):
                 self.values += values
 
         def add(self, key, value):
-                i = binary_search(self.keys, key)                                
+                i = binary_search(self.keys, key)
                 if i >= 0:
                         self.values[i] = value
                         return True
-                        
-                if len(self.keys) == NodeSize: 
+
+                if len(self.keys) == NodeSize:
                         return False
                 i = ~i
-                        
+
                 self.keys.insert(i, key)
                 self.values.insert(i, value)
                 return True
@@ -95,7 +95,7 @@ class Node(object):
                 if i >= 0:
                         return self.values[i]
                 return None
-        
+
         def items(self):
                 for i in xrange(self.count):
                         yield (self.keys[i], self.values[i])
@@ -103,7 +103,7 @@ class Node(object):
 class Leaf(Node):
         def __init__(self):
                 Node.__init__(self)
-        def new(self):         
+        def new(self):
                 return Leaf()
         def remove(self, key):
                 i = binary_search(self.keys, key)
@@ -115,10 +115,10 @@ class Leaf(Node):
 
 
 class Internal(Node):
-        def __init__(self): 
-                Node.__init__(self)                
-        def new(self):         
-                return Internal()        
+        def __init__(self):
+                Node.__init__(self)
+        def new(self):
+                return Internal()
         def get_node(self, key):
                 i = binary_search(self.keys, key)
                 if i < 0:
@@ -146,12 +146,12 @@ class Internal(Node):
                 i -= 1
                 if i < 0: return None
                 return self.values[i]
-        
+
         def right_of(self, i):
                 i += 1
                 if i >= self.count: return None
                 return self.values[i]
-        
+
         def replace(self, index, node):
                 self.keys[index]   = node.keys[0]
                 self.values[index] = node
@@ -190,7 +190,7 @@ class BTree:
         def _add_root_internal(self, key, value):
                 parent = self._add_internal(None, self.root, key ,value)
                 if parent: self.root = parent
-                
+
         def _add_internal(self, parent, node, key, value):
                 if node.is_full:
                         if not parent:
@@ -198,7 +198,7 @@ class BTree:
                                 parent.add_node(node)
                         parent.add_node(node.split())
                         node = parent
-                
+
                 next_index, next_node = node.get_node(key)
                 node.update_node(next_index, key)
                 if next_node.is_internal:
@@ -209,7 +209,7 @@ class BTree:
                         parent = self._add_internal(parent, node, key, value)
                 return parent
 
-        def remove(self, key):                
+        def remove(self, key):
                 if not self.root: return
                 if self.root.is_leaf:
                         self._remove_root_leaf(key)
@@ -223,12 +223,12 @@ class BTree:
         def _remove_root_internal(self, key):
                 nodes = self.move_to(key)
                 leaf = nodes[-1][1]
-                if not leaf.remove(key): 
+                if not leaf.remove(key):
                         return
                 if not leaf.is_empty:
                         self._update_parents(nodes)
                 #if not self._rebalance(nodes):
-                #        return 
+                #        return
                 self.root = nodes[0][1]
 
         def _update_parents(self, nodes):
@@ -236,18 +236,18 @@ class BTree:
                         index, parent =nodes[-(x+2)]
                         _, child = nodes[-(x + 1)]
                         parent.update(index, child)
-                        
+
 
         def _rebalance(self, nodes):
-                if len(nodes) < 2: 
+                if len(nodes) < 2:
                         return
 
                 left  = None
                 right = None
                 leaf  = nodes[-1][1]
-                if leaf.count >= MinNodeSize: 
+                if leaf.count >= MinNodeSize:
                         return
-                
+
                 left_nodes = self._left_child(nodes)
                 if left_nodes:
                         left = left_nodes[-1][1]
@@ -266,13 +266,13 @@ class BTree:
                                 leaf.add_from_left(right)
                                 self._update_parents(right_nodes)
                                 return
-                
+
                 if left:
 #                        print "in left"
                         same_type_check(left, leaf)
 
                         left.add_right(leaf.keys, leaf.values)
-                        child_index, parent = nodes[-2]    
+                        child_index, parent = nodes[-2]
                         parent.remove_at(child_index)
                         self._rebalance(nodes[:-1])
                         return
@@ -282,20 +282,20 @@ class BTree:
 
                         right.add_left(leaf.keys, leaf.values)
                         self._update_parents(right_nodes)
-                        child_index, parent = nodes[-2]                        
+                        child_index, parent = nodes[-2]
                         parent.remove_at(child_index)
                         self._rebalance(nodes[:-1])
                         return
 
                 nodes[-2] = (0, leaf)
                 self._rebalance(nodes[:-2])
-        
-        
+
+
         def get(self, key):
                 if not self.root:
                         return None
                 return self._get(self.root, key)
-        
+
         def _get(self, node, key):
                 if node.is_leaf:
                         return node.get(key)
@@ -337,7 +337,7 @@ class BTree:
                         parent = parent.values[index2]
                         index2 = 0 # left most
                 return right_path
-        
+
         def move_to(self, key):
                 nodes = []
                 if not self.root:
@@ -350,15 +350,15 @@ class BTree:
                         next_index, next_node = node.get_node(key)
                         nodes.append((next_index, node))
                         self._move_to(nodes, key, next_node)
-                else:                
-                        i = binary_search(node.keys, key)                        
+                else:
+                        i = binary_search(node.keys, key)
                         nodes.append((i, node))
 
         def items(self):
                 if self.root:
                         for x in self._items(self.root):
                                 yield x
-                
+
         def _items(self, node):
                 if node.is_leaf:
                         for x in node.items():
@@ -400,17 +400,17 @@ class Test(unittest.TestCase):
 
                 count = 1000000
                 items = list(set(random() for x in xrange(count*2)))[:count] # unique random values
-                
+
                 tree = BTree()
                 for x in items:
                         tree.add(x, x)
 
                 self._assert_order(tree.items())
-                        
+
                 for item in items:
                         x = tree.get(item)
                         self.assertEqual(item, x)
-                                                
+
                 for item in items:
                         #print count
                         #self._assert_order(tree.items())
@@ -427,9 +427,9 @@ class Test(unittest.TestCase):
                 for item in items:
                         tree.remove(item)
                         count -= 1
-                
+
 
                 self.assertEqual(0, iter_len(tree.items()))
 
-if __name__=="__main__":                
+if __name__=="__main__":
         unittest.main()
